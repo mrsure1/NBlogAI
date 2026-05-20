@@ -6,26 +6,22 @@ QMainWindow, QWidget {
     font-size: 14px;
 }
 
-QLabel {
-    color: #cdd6f4;
-    padding: 4px 2px 4px 2px;
-    min-height: 22px;
-}
-
 QTabWidget::pane {
     border: 1px solid #313244;
     background-color: #1e1e2e;
     border-radius: 6px;
+    margin-top: 4px;
 }
 
 QTabBar::tab {
     background-color: #181825;
     color: #a6adc8;
-    padding: 14px 22px 14px 22px;
+    padding: 10px 22px;
     border: none;
     font-size: 14px;
     min-width: 140px;
-    min-height: 44px;
+    min-height: 28px;
+    margin-right: 2px;
 }
 
 QTabBar::tab:selected {
@@ -45,10 +41,10 @@ QPushButton {
     color: #1e1e2e;
     border: none;
     border-radius: 6px;
-    padding: 12px 18px 12px 18px;
+    padding: 8px 14px;
     font-weight: bold;
     font-size: 13px;
-    min-height: 40px;
+    min-height: 22px;
 }
 
 QPushButton:hover {
@@ -64,14 +60,10 @@ QPushButton:disabled {
     color: #6c7086;
 }
 
-QPushButton#btnGreen {
-    background-color: #a6e3a1;
-}
+QPushButton#btnGreen { background-color: #a6e3a1; }
 QPushButton#btnGreen:hover { background-color: #c3f0bc; }
 
-QPushButton#btnRed {
-    background-color: #f38ba8;
-}
+QPushButton#btnRed { background-color: #f38ba8; }
 QPushButton#btnRed:hover { background-color: #f5a3b8; }
 
 QPushButton#btnYellow {
@@ -84,13 +76,13 @@ QLineEdit, QTextEdit, QPlainTextEdit {
     background-color: #313244;
     border: 1px solid #45475a;
     border-radius: 6px;
-    padding: 10px 12px 10px 12px;
+    padding: 6px 10px;
     color: #cdd6f4;
     selection-background-color: #89b4fa;
 }
 
 QLineEdit {
-    min-height: 24px;
+    min-height: 22px;
 }
 
 QLineEdit:focus, QTextEdit:focus {
@@ -101,15 +93,15 @@ QComboBox {
     background-color: #313244;
     border: 1px solid #45475a;
     border-radius: 6px;
-    padding: 10px 12px 10px 12px;
+    padding: 6px 10px;
     color: #cdd6f4;
     min-width: 100px;
-    min-height: 40px;
+    min-height: 22px;
 }
 
 QComboBox::drop-down {
     border: none;
-    width: 20px;
+    width: 22px;
 }
 
 QComboBox QAbstractItemView {
@@ -118,22 +110,28 @@ QComboBox QAbstractItemView {
     color: #cdd6f4;
     selection-background-color: #89b4fa;
     selection-color: #1e1e2e;
+    padding: 4px;
+}
+
+QComboBox QAbstractItemView::item {
+    min-height: 28px;
+    padding: 4px 8px;
 }
 
 QSpinBox {
     background-color: #313244;
     border: 1px solid #45475a;
     border-radius: 6px;
-    padding: 10px 12px 10px 12px;
+    padding: 6px 10px;
     color: #cdd6f4;
-    min-height: 40px;
+    min-height: 22px;
 }
 
 QGroupBox {
     border: 1px solid #45475a;
     border-radius: 8px;
-    margin-top: 20px;
-    padding-top: 12px;
+    margin-top: 18px;
+    padding: 14px 10px 10px 10px;
     font-weight: bold;
     color: #89b4fa;
 }
@@ -141,21 +139,22 @@ QGroupBox {
 QGroupBox::title {
     subcontrol-origin: margin;
     subcontrol-position: top left;
-    padding: 2px 8px 0px 8px;
-    left: 12px;
-    top: -11px;
+    padding: 0px 10px;
+    left: 14px;
+    top: 2px;
     background-color: #1e1e2e;
+    color: #89b4fa;
 }
 
 QScrollBar:vertical {
     background-color: #181825;
-    width: 8px;
-    border-radius: 4px;
+    width: 10px;
+    border-radius: 5px;
 }
 
 QScrollBar::handle:vertical {
     background-color: #45475a;
-    border-radius: 4px;
+    border-radius: 5px;
     min-height: 30px;
 }
 
@@ -165,24 +164,28 @@ QScrollBar::handle:vertical:hover {
 
 QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical { height: 0; }
 
+QLabel {
+    color: #cdd6f4;
+    padding: 2px 0px;
+}
+
 QLabel#labelTitle {
-    font-size: 16px;
+    font-size: 15px;
     font-weight: bold;
     color: #89b4fa;
-    min-height: 26px;
-    padding: 4px 2px;
+    padding: 4px 0px;
 }
 
 QLabel#labelSub {
     color: #a6adc8;
     font-size: 12px;
-    min-height: 18px;
-    padding: 2px;
+    padding: 2px 0px;
 }
 
 QCheckBox {
     spacing: 8px;
     color: #cdd6f4;
+    padding: 2px 0px;
 }
 
 QCheckBox::indicator {
@@ -222,7 +225,7 @@ QProgressBar {
     background-color: #313244;
     text-align: center;
     color: #cdd6f4;
-    height: 20px;
+    min-height: 22px;
 }
 
 QProgressBar::chunk {
@@ -268,6 +271,29 @@ QDateTimeEdit {
     border-radius: 6px;
     padding: 6px 10px;
     color: #cdd6f4;
+    min-height: 22px;
+}
+
+QListWidget {
+    background-color: #313244;
+    border: 1px solid #45475a;
+    border-radius: 6px;
+    color: #cdd6f4;
+    padding: 4px;
+}
+
+QListWidget::item {
+    padding: 8px 10px;
+    border-radius: 4px;
+}
+
+QListWidget::item:selected {
+    background-color: #89b4fa;
+    color: #1e1e2e;
+}
+
+QListWidget::item:hover {
+    background-color: #45475a;
 }
 """
 

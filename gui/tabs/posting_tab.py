@@ -6,11 +6,12 @@ from datetime import datetime
 from pathlib import Path
 
 from PySide6.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QGridLayout,
+    QWidget, QVBoxLayout, QHBoxLayout, QGridLayout, QFormLayout,
     QLabel, QLineEdit, QTextEdit, QPushButton, QComboBox,
     QSpinBox, QGroupBox, QSplitter, QFileDialog,
     QScrollArea, QRadioButton, QButtonGroup, QDateTimeEdit,
     QTableWidget, QTableWidgetItem, QHeaderView, QCheckBox,
+    QListWidget, QListWidgetItem, QMessageBox, QInputDialog,
 )
 from PySide6.QtCore import Qt, QThread, Signal, QDateTime
 from PySide6.QtGui import QFont, QColor
@@ -97,37 +98,125 @@ class PostingTab(QWidget):
         root.addWidget(splitter)
 
     def _build_input_section(self) -> QGroupBox:
-        box = QGroupBox("글 생성 설정")
-        grid = QGridLayout(box)
-        grid.setSpacing(8)
+        box = QGroupBox("🔥 트렌드 토픽 선택")
+        layout = QVBoxLayout(box)
+        layout.setSpacing(10)
 
-        grid.addWidget(QLabel("주제 키워드 *"), 0, 0)
-        self.inp_topic = QLineEdit()
-        self.inp_topic.setPlaceholderText("예: 제주도 맛집, 초보 재테크")
-        grid.addWidget(self.inp_topic, 0, 1, 1, 3)
+        # ── 카테고리 필터 + 새로고침 ─────────────────────────────────────
+        top_row = QHBoxLayout()
+        top_row.addWidget(QLabel("카테고리:"))
+        self.combo_category = QComboBox()
+        self.combo_category.addItem("전체")
+        self.combo_category.currentTextChanged.connect(self._refresh_topic_list)
+        top_row.addWidget(self.combo_category)
 
-        grid.addWidget(QLabel("트렌드 키워드"), 1, 0)
-        self.inp_trend = QLineEdit()
-        self.inp_trend.setPlaceholderText("예: MZ세대, 2026 트렌드 (선택)")
-        grid.addWidget(self.inp_trend, 1, 1, 1, 3)
+        btn_refresh = QPushButton("🔄 새로고침")
+        btn_refresh.setMaximumWidth(110)
+        btn_refresh.clicked.connect(self._refresh_topic_pool)
+        top_row.addWidget(btn_refresh)
 
-        grid.addWidget(QLabel("시리즈 편수"), 2, 0)
+        btn_add = QPushButton("➕ 직접 추가")
+        btn_add.setMaximumWidth(110)
+        btn_add.clicked.connect(self._add_custom_topic)
+        top_row.addWidget(btn_add)
+        top_row.addStretch()
+        layout.addLayout(top_row)
+
+        # ── 토픽 리스트 ─────────────────────────────────────────────────
+        self.lst_topics = QListWidget()
+        self.lst_topics.setMaximumHeight(180)
+        self.lst_topics.itemSelectionChanged.connect(self._on_topic_selected)
+        layout.addWidget(self.lst_topics)
+
+        # ── 선택된 토픽 표시 ────────────────────────────────────────────
+        self.lbl_selected = QLabel("선택된 토픽: (리스트에서 선택하세요)")
+        self.lbl_selected.setObjectName("labelSub")
+        self.lbl_selected.setWordWrap(True)
+        layout.addWidget(self.lbl_selected)
+
+        # ── 옵션: 시리즈/분량/이미지 ───────────────────────────────────
+        opt_row = QGridLayout()
+        opt_row.setHorizontalSpacing(12)
+        opt_row.setVerticalSpacing(8)
+
+        opt_row.addWidget(QLabel("시리즈 편수"), 0, 0)
         self.spin_series = QSpinBox()
         self.spin_series.setRange(1, 5)
         self.spin_series.setValue(1)
-        grid.addWidget(self.spin_series, 2, 1)
+        opt_row.addWidget(self.spin_series, 0, 1)
 
-        grid.addWidget(QLabel("글 분량"), 2, 2)
+        opt_row.addWidget(QLabel("글 분량"), 0, 2)
         self.combo_length = QComboBox()
         self.combo_length.addItems(["표준", "짧음", "길게"])
-        grid.addWidget(self.combo_length, 2, 3)
+        opt_row.addWidget(self.combo_length, 0, 3)
 
-        grid.addWidget(QLabel("이미지 크기"), 3, 0)
+        opt_row.addWidget(QLabel("이미지 크기"), 1, 0)
         self.combo_img_size = QComboBox()
         self.combo_img_size.addItems(["중형", "소형", "대형"])
-        grid.addWidget(self.combo_img_size, 3, 1)
+        opt_row.addWidget(self.combo_img_size, 1, 1)
 
+        layout.addLayout(opt_row)
+
+        # 토픽 풀 로드
+        self._selected_topic = None
+        self._load_topic_pool()
         return box
+
+    # ── 트렌드 토픽 헬퍼 ─────────────────────────────────────────────────
+    def _load_topic_pool(self):
+        from core.trend_topics import load_topics
+        self._topic_pool = load_topics()
+        # 카테고리 콤보 갱신
+        cats = sorted({t.get("category", "기타") for t in self._topic_pool})
+        current = self.combo_category.currentText() if self.combo_category.count() else "전체"
+        self.combo_category.blockSignals(True)
+        self.combo_category.clear()
+        self.combo_category.addItem("전체")
+        for c in cats:
+            self.combo_category.addItem(c)
+        idx = self.combo_category.findText(current)
+        self.combo_category.setCurrentIndex(idx if idx >= 0 else 0)
+        self.combo_category.blockSignals(False)
+        self._refresh_topic_list()
+
+    def _refresh_topic_list(self):
+        self.lst_topics.clear()
+        cat = self.combo_category.currentText()
+        for t in self._topic_pool:
+            if cat != "전체" and t.get("category") != cat:
+                continue
+            label = f"[{t.get('category', '')}] {t.get('topic', '')}"
+            item = QListWidgetItem(label)
+            item.setData(0x0100, t)  # Qt.UserRole = 256
+            self.lst_topics.addItem(item)
+
+    def _on_topic_selected(self):
+        items = self.lst_topics.selectedItems()
+        if not items:
+            self._selected_topic = None
+            self.lbl_selected.setText("선택된 토픽: (리스트에서 선택하세요)")
+            return
+        t = items[0].data(0x0100)
+        self._selected_topic = t
+        self.lbl_selected.setText(
+            f"✅ 선택: {t.get('topic', '')}  |  트렌드KW: {t.get('trend_kw', '-')}"
+        )
+
+    def _refresh_topic_pool(self):
+        from core.trend_topics import refresh_topics
+        refresh_topics(force=True)
+        self._load_topic_pool()
+        self._log("🔄 트렌드 토픽 풀을 갱신했습니다.")
+
+    def _add_custom_topic(self):
+        topic, ok = QInputDialog.getText(self, "직접 토픽 추가", "토픽 제목:")
+        if not ok or not topic.strip():
+            return
+        trend_kw, _ = QInputDialog.getText(self, "트렌드 키워드", "트렌드 키워드 (선택):")
+        from core.trend_topics import add_custom_topic
+        add_custom_topic(topic.strip(), trend_kw.strip())
+        self._load_topic_pool()
+        self._log(f"➕ 토픽 추가: {topic.strip()}")
 
     def _build_buttons_section(self) -> QGroupBox:
         box = QGroupBox("3단계 실행")
@@ -272,10 +361,12 @@ class PostingTab(QWidget):
         self.btn_generate.setEnabled(enabled)
 
     def _on_generate(self):
-        topic = self.inp_topic.text().strip()
-        if not topic:
-            self._log("⚠ 주제 키워드를 입력하세요.")
+        if not self._selected_topic:
+            self._log("⚠ 리스트에서 토픽을 먼저 선택하세요.")
             return
+        topic = self._selected_topic.get("topic", "").strip()
+        trend_kw = self._selected_topic.get("trend_kw", "").strip()
+        self._active_topic_title = topic  # 발행 시 풀에서 제거할 때 사용
 
         count = self.spin_series.value()
         self._log(f"AI 포스트 생성 시작: '{topic}' {count}편...")
@@ -290,7 +381,7 @@ class PostingTab(QWidget):
                 self.log_signal_proxy(f"  {i+1}편 생성 중...")
                 post = generate_post(
                     topic=topic,
-                    trend_kw=self.inp_trend.text().strip(),
+                    trend_kw=trend_kw,
                     length=self.combo_length.currentText(),
                     style_index=self.style_index + i,
                 )
@@ -376,11 +467,23 @@ class PostingTab(QWidget):
 
         self.worker = WorkerThread(task)
         self.worker.log_signal.connect(self._log)
-        self.worker.done_signal.connect(lambda ok, _: (
-            self.btn_publish.setEnabled(True),
-            self._log("✅ 발행 완료!" if ok else "❌ 발행 실패")
-        ))
+        self.worker.done_signal.connect(self._on_publish_done)
         self.worker.start()
+
+    def _on_publish_done(self, ok: bool, _result):
+        self.btn_publish.setEnabled(True)
+        if ok:
+            self._log("✅ 발행 완료!")
+            # 사용한 토픽 풀에서 제거
+            active = getattr(self, "_active_topic_title", None)
+            if active:
+                from core.trend_topics import remove_topic
+                if remove_topic(active):
+                    self._log(f"🗑 토픽 풀에서 제거: {active}")
+                    self._load_topic_pool()
+                self._active_topic_title = None
+        else:
+            self._log("❌ 발행 실패")
 
     def _run_seo(self):
         if not self.current_post:

@@ -6,6 +6,7 @@ __pycache__/
 images/
 data/posts.json
 data/post_queue.json
+data/trending_topics.json
 *.log
 .idea/
 .vscode/
