@@ -1,161 +1,259 @@
-import io
+import math
 import time
-import urllib.parse
 from pathlib import Path
 
-import requests
-from PIL import Image
-
-from utils.config import get_value
+from PIL import Image, ImageDraw, ImageFont
 
 IMAGE_DIR = Path(__file__).parent.parent / "images"
 IMAGE_DIR.mkdir(exist_ok=True)
 
-SIZE_MAP = {
-    "소형": (800, 450),
-    "중형": (1200, 675),
-    "대형": (1600, 900),
-}
+FONT_PATH = "C:/Windows/Fonts/malgunbd.ttf"   # 맑은 고딕 Bold
+FONT_PATH_REG = "C:/Windows/Fonts/malgun.ttf"  # 맑은 고딕 Regular
 
-# 대표/배너 이미지용 고정 사이즈
-COVER_SIZE = (1200, 630)
-SECTION_SIZE = (1000, 560)
+COVER_SIZE = (1200, 400)
+SECTION_SIZE = (1200, 280)
+
+# 색상 팔레트 (start_left, start_right, text, accent)
+COLOR_SCHEMES = [
+    ((10, 25, 80),  (20, 55, 130), (255, 255, 255), (100, 180, 255)),   # 딥 블루
+    ((15, 55, 25),  (30, 95, 45),  (255, 255, 255), (100, 230, 140)),   # 딥 그린
+    ((55, 10, 75),  (90, 25, 120), (255, 255, 255), (210, 140, 255)),   # 딥 퍼플
+    ((10, 50, 65),  (25, 85, 105), (255, 255, 255), (90, 220, 235)),    # 딥 틸
+    ((70, 25, 10),  (120, 50, 15), (255, 255, 255), (255, 190, 100)),   # 딥 오렌지
+    ((20, 10, 55),  (50, 25, 90),  (255, 255, 255), (175, 155, 255)),   # 인디고
+    ((55, 10, 30),  (100, 20, 55), (255, 255, 255), (255, 140, 180)),   # 딥 로즈
+    ((10, 40, 55),  (20, 70, 90),  (255, 255, 255), (120, 220, 255)),   # 오션
+]
 
 
-def _pollinations_url(prompt: str, width: int, height: int) -> str:
-    encoded = urllib.parse.quote(prompt, safe="")
-    return (
-        f"https://image.pollinations.ai/prompt/{encoded}"
-        f"?width={width}&height={height}&nologo=true&model=flux&enhance=true"
-    )
+def _get_font(size: int, bold: bool = True) -> ImageFont.FreeTypeFont:
+    path = FONT_PATH if bold else FONT_PATH_REG
+    try:
+        return ImageFont.truetype(path, size)
+    except Exception:
+        return ImageFont.load_default()
 
 
-def _download_image(prompt: str, width: int, height: int, save_path: Path, retries: int = 3) -> bool:
-    url = _pollinations_url(prompt, width, height)
-    for attempt in range(retries):
+def _gradient_bg(size: tuple, c_left: tuple, c_right: tuple) -> Image.Image:
+    """좌→우 수평 그라디언트 배경"""
+    w, h = size
+    img = Image.new("RGB", (w, h))
+    draw = ImageDraw.Draw(img)
+    for x in range(w):
+        t = x / (w - 1)
+        r = int(c_left[0] + (c_right[0] - c_left[0]) * t)
+        g = int(c_left[1] + (c_right[1] - c_left[1]) * t)
+        b = int(c_left[2] + (c_right[2] - c_left[2]) * t)
+        draw.line([(x, 0), (x, h)], fill=(r, g, b))
+    return img
+
+
+def _draw_deco_circles(draw: ImageDraw.Draw, cx: int, cy: int,
+                       accent: tuple, count: int = 4):
+    """오른쪽 장식 원형 아크"""
+    for i in range(count, 0, -1):
+        r = i * 38
+        alpha = int(60 + (count - i) * 30)
+        color = (*accent, alpha)
         try:
-            resp = requests.get(url, timeout=90, stream=True)
-            resp.raise_for_status()
-            img = Image.open(io.BytesIO(resp.content))
-            img = img.convert("RGB")
-            img.save(str(save_path), "PNG", optimize=True)
-            return True
-        except Exception as e:
-            print(f"  이미지 생성 재시도 {attempt + 1}/{retries}: {e}")
-            time.sleep(3)
-    return False
+            draw.arc(
+                [cx - r, cy - r, cx + r, cy + r],
+                start=200, end=340,
+                fill=accent,
+                width=max(2, 5 - i),
+            )
+        except Exception:
+            pass
 
 
-def _build_cover_prompt(post_data: dict) -> str:
-    """포스트 전체를 대표하는 커버 이미지 프롬프트"""
+def _draw_dot_grid(draw: ImageDraw.Draw, x0: int, y0: int,
+                   accent: tuple, cols: int = 5, rows: int = 4):
+    """작은 점 그리드 장식"""
+    gap = 18
+    for row in range(rows):
+        for col in range(cols):
+            cx = x0 + col * gap
+            cy = y0 + row * gap
+            opacity = 80 + col * 20
+            r = 2
+            draw.ellipse([cx - r, cy - r, cx + r, cy + r],
+                         fill=(*accent[:3], min(opacity, 200)))
+
+
+def _wrap_text(text: str, font: ImageFont.FreeTypeFont,
+               max_width: int) -> list[str]:
+    """텍스트를 max_width에 맞게 줄바꿈"""
+    words = text
+    lines = []
+    current = ""
+    for char in words:
+        test = current + char
+        bbox = font.getbbox(test)
+        if bbox[2] - bbox[0] > max_width and current:
+            lines.append(current)
+            current = char
+        else:
+            current = test
+    if current:
+        lines.append(current)
+    return lines
+
+
+def _draw_text_shadow(draw, pos, text, font, fill, shadow_offset=2):
+    """그림자 효과 텍스트"""
+    x, y = pos
+    draw.text((x + shadow_offset, y + shadow_offset), text,
+              font=font, fill=(0, 0, 0, 100))
+    draw.text((x, y), text, font=font, fill=fill)
+
+
+def create_banner(title: str, subtitle: str = "",
+                  size: tuple = COVER_SIZE,
+                  scheme_idx: int = None) -> Image.Image:
+    """
+    타이틀+부제목이 올라간 그라디언트 배너 이미지 생성
+    """
+    if scheme_idx is None:
+        scheme_idx = abs(hash(title)) % len(COLOR_SCHEMES)
+
+    c_left, c_right, text_color, accent = COLOR_SCHEMES[scheme_idx % len(COLOR_SCHEMES)]
+    w, h = size
+
+    # ── 배경 ──────────────────────────────────────────────────────────────────
+    img = _gradient_bg(size, c_left, c_right)
+    draw = ImageDraw.Draw(img, "RGBA")
+
+    # ── 장식 요소 ──────────────────────────────────────────────────────────────
+    # 오른쪽 아크
+    _draw_deco_circles(draw, cx=w - 80, cy=h // 2, accent=accent, count=5)
+    # 점 그리드 (우하단)
+    _draw_dot_grid(draw, x0=w - 160, y0=h - 90, accent=accent, cols=5, rows=3)
+    # 좌측 하단 장식 라인
+    for i in range(3):
+        y_line = h - 30 + i * 8
+        draw.line([(60, y_line), (200, y_line)],
+                  fill=(*accent[:3], 60 + i * 30), width=2)
+
+    # ── 제목 텍스트 ────────────────────────────────────────────────────────────
+    margin_left = 70
+    text_max_w = int(w * 0.65)
+    y_cursor = int(h * 0.18)
+
+    # 제목 폰트 크기 자동 조정
+    title_font_size = max(32, min(54, int(h * 0.13)))
+    title_font = _get_font(title_font_size, bold=True)
+
+    title_lines = _wrap_text(title, title_font, text_max_w)
+    # 최대 2줄
+    for i, line in enumerate(title_lines[:2]):
+        _draw_text_shadow(draw, (margin_left, y_cursor), line,
+                          title_font, fill=text_color)
+        y_cursor += title_font_size + 8
+
+    # ── 부제목 텍스트 ───────────────────────────────────────────────────────────
+    if subtitle:
+        y_cursor += 10
+        sub_font_size = max(16, int(title_font_size * 0.42))
+        sub_font = _get_font(sub_font_size, bold=False)
+        sub_lines = _wrap_text(subtitle, sub_font, text_max_w)
+        for line in sub_lines[:2]:
+            sub_color = tuple(min(255, c + 60) for c in text_color[:3])
+            draw.text((margin_left, y_cursor), line,
+                      font=sub_font, fill=sub_color)
+            y_cursor += sub_font_size + 4
+
+    # ── 하단 강조 바 ───────────────────────────────────────────────────────────
+    bar_h = max(4, h // 80)
+    draw.rectangle([0, h - bar_h, w, h],
+                   fill=(*accent[:3], 180))
+
+    return img.convert("RGB")
+
+
+def generate_cover_image(post_data: dict, slug: str = "post",
+                         scheme_idx: int = None) -> str:
+    """포스트 대표 커버 배너 생성"""
     title = post_data.get("title", "")
-    keywords = post_data.get("keywords", [])
-    kw_str = ", ".join(keywords[:3]) if keywords else ""
+    description = post_data.get("description", "")
+    if scheme_idx is None:
+        scheme_idx = abs(hash(title)) % len(COLOR_SCHEMES)
 
-    # 첫 번째 섹션의 image_prompt가 있으면 참고
-    first_prompt = ""
-    for section in post_data.get("sections", []):
-        for sub in section.get("subsections", []):
-            if sub.get("image_prompt"):
-                first_prompt = sub["image_prompt"]
-                break
-        if first_prompt:
-            break
-
-    base = first_prompt if first_prompt else f"professional blog cover about {kw_str or title}"
-    return (
-        f"{base}, "
-        "professional blog banner image, high quality photography, "
-        "clean composition, vibrant colors, modern aesthetic, "
-        "16:9 aspect ratio, no text overlay"
-    )
-
-
-def _build_section_prompt(image_prompt: str, h2: str = "") -> str:
-    """섹션별 배너 이미지 프롬프트"""
-    base = image_prompt or f"professional illustration about {h2}"
-    return (
-        f"{base}, "
-        "high quality blog section banner, professional photography or illustration, "
-        "clean and modern design, good lighting, no text"
-    )
-
-
-def generate_cover_image(post_data: dict, slug: str = "post") -> str:
-    """포스트 대표(커버) 이미지 생성"""
-    prompt = _build_cover_prompt(post_data)
     save_path = IMAGE_DIR / f"{slug}-cover.png"
-    w, h = COVER_SIZE
-
-    print(f"  커버 이미지 생성 중... ({w}x{h})")
-    success = _download_image(prompt, w, h, save_path)
-    if success:
-        return str(save_path)
-    return ""
+    img = create_banner(title, description, size=COVER_SIZE,
+                        scheme_idx=scheme_idx)
+    img.save(str(save_path), "PNG")
+    return str(save_path)
 
 
-def generate_section_image(image_prompt: str, h2: str, filename: str) -> str:
-    """섹션 배너 이미지 생성"""
-    prompt = _build_section_prompt(image_prompt, h2)
+def generate_section_image(h2: str, h3: str = "",
+                           filename: str = "section.png",
+                           scheme_idx: int = None) -> str:
+    """섹션 배너 이미지 생성 (h2 타이틀 + h3 부제목)"""
+    if scheme_idx is None:
+        # 커버와 다른 색상 스킴 사용 (커버+1)
+        scheme_idx = (abs(hash(h2)) % len(COLOR_SCHEMES))
+
     save_path = IMAGE_DIR / filename
-    w, h = SECTION_SIZE
-
-    success = _download_image(prompt, w, h, save_path)
-    if success:
-        return str(save_path)
-    return ""
+    img = create_banner(h2, h3, size=SECTION_SIZE, scheme_idx=scheme_idx)
+    img.save(str(save_path), "PNG")
+    return str(save_path)
 
 
-def generate_post_images(post_data: dict, size: str = "중형", slug: str = "post",
+def generate_post_images(post_data: dict, size: str = "중형",
+                         slug: str = "post",
                          log_callback=None) -> dict:
     """
-    포스트의 모든 이미지 생성:
-    - cover: 대표 이미지 1장
-    - sections: 섹션별 배너 이미지
-
-    반환: {"cover": path, "sections": [...paths]}
+    포스트 전체 배너 이미지 일괄 생성
+    - cover: 대표 이미지 (title + description)
+    - sections: 섹션별 배너 (h2 + h3)
     """
     def log(msg):
         if log_callback:
             log_callback(msg)
         print(msg)
 
-    result = {"cover": "", "sections": []}
     slug_safe = slug[:30].replace(" ", "_").replace("/", "_")
+    title = post_data.get("title", "")
+    base_scheme = abs(hash(title)) % len(COLOR_SCHEMES)
+    result = {"cover": "", "sections": []}
 
-    # 1) 커버 이미지
-    log("  [1] 대표 커버 이미지 생성 중... (약 20초)")
-    cover_path = generate_cover_image(post_data, slug_safe)
-    if cover_path:
+    # ── 커버 이미지 ────────────────────────────────────────────────────────────
+    log("  [커버] 대표 배너 이미지 생성 중...")
+    try:
+        cover_path = generate_cover_image(post_data, slug_safe, scheme_idx=base_scheme)
         post_data["cover_image"] = cover_path
         result["cover"] = cover_path
-        log(f"  ✓ 커버 이미지: {Path(cover_path).name}")
-    else:
-        log("  ✗ 커버 이미지 생성 실패")
+        log(f"  [OK] 커버: {Path(cover_path).name}")
+    except Exception as e:
+        log(f"  [FAIL] 커버 실패: {e}")
 
-    # 2) 섹션별 이미지
+    # ── 섹션별 배너 ────────────────────────────────────────────────────────────
     sections = post_data.get("sections", [])
-    img_count = 0
     for i, section in enumerate(sections):
         h2 = section.get("h2", "")
-        for j, sub in enumerate(section.get("subsections", [])):
-            image_prompt = sub.get("image_prompt", "")
-            if not image_prompt and not h2:
-                continue
+        if not h2:
+            continue
+        # 각 섹션마다 색상 순환
+        scheme = (base_scheme + i + 1) % len(COLOR_SCHEMES)
+        fname = f"{slug_safe}-s{i}.png"
 
-            fname = f"{slug_safe}-s{i}-{j}.png"
-            log(f"  [{img_count + 2}] 섹션 이미지 생성 중: {h2[:20]}...")
-            path = generate_section_image(image_prompt, h2, fname)
-            if path:
+        # 첫 번째 subsection의 h3 사용
+        h3 = ""
+        subs = section.get("subsections", [])
+        if subs and subs[0].get("h3") and subs[0]["h3"] != h2:
+            h3 = subs[0]["h3"]
+
+        log(f"  [섹션 {i+1}] {h2[:25]}...")
+        try:
+            path = generate_section_image(h2, h3, fname, scheme_idx=scheme)
+            # 섹션의 모든 subsection에 이미지 경로 공유
+            for sub in subs:
                 sub["image_path"] = path
-                result["sections"].append(path)
-                img_count += 1
-                log(f"  ✓ {Path(path).name}")
-            else:
-                log(f"  ✗ 섹션 이미지 실패")
+            result["sections"].append(path)
+            log(f"  [OK] {fname}")
+        except Exception as e:
+            log(f"  [FAIL] 섹션 {i+1} 실패: {e}")
 
-            # 섹션당 최대 1장 (속도 고려)
-            break
-
-    log(f"  이미지 생성 완료: 커버 1장 + 섹션 {img_count}장")
+    total = (1 if result["cover"] else 0) + len(result["sections"])
+    log(f"  완료: 총 {total}장 생성 (커버 1 + 섹션 {len(result['sections'])})")
     return result
