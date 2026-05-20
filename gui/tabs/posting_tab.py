@@ -332,15 +332,21 @@ class PostingTab(QWidget):
         if not self.current_post:
             self._log("⚠ 먼저 포스트를 생성하세요.")
             return
-        self._log("이미지 생성 중... (약 20초)")
+        sections_count = len(self.current_post.get("sections", []))
+        self._log(f"AI 이미지 생성 시작 (커버 1장 + 섹션 {sections_count}장, 각 약 20초)...")
         self.btn_image.setEnabled(False)
         size = self.combo_img_size.currentText()
 
         def task():
             from core.image_generator import generate_post_images
             slug = self.current_post.get("title", "post")[:20].replace(" ", "_")
-            paths = generate_post_images(self.current_post.get("sections", []), size, slug)
-            return paths
+            result = generate_post_images(
+                post_data=self.current_post,
+                size=size,
+                slug=slug,
+                log_callback=self._log,
+            )
+            return result
 
         self.worker = WorkerThread(task)
         self.worker.log_signal.connect(self._log)
@@ -350,9 +356,12 @@ class PostingTab(QWidget):
     def _on_image_done(self, success: bool, result):
         self.btn_image.setEnabled(True)
         if success and result:
-            self._log(f"✅ 이미지 {len(result)}장 생성 완료!")
+            cover = result.get("cover", "")
+            sections = result.get("sections", [])
+            total = (1 if cover else 0) + len(sections)
+            self._log(f"✅ 이미지 생성 완료! 커버 {'1장' if cover else '실패'} + 섹션 {len(sections)}장 (총 {total}장)")
         else:
-            self._log("이미지 생성 실패 (API 설정 확인)")
+            self._log("❌ 이미지 생성 실패")
 
     def _on_publish(self):
         if not self.current_post:
