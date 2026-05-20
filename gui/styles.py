@@ -6,6 +6,12 @@ QMainWindow, QWidget {
     font-size: 14px;
 }
 
+QLabel {
+    color: #cdd6f4;
+    padding: 4px 2px 4px 2px;
+    min-height: 22px;
+}
+
 QTabWidget::pane {
     border: 1px solid #313244;
     background-color: #1e1e2e;
@@ -15,11 +21,11 @@ QTabWidget::pane {
 QTabBar::tab {
     background-color: #181825;
     color: #a6adc8;
-    padding: 12px 20px 8px 20px;
+    padding: 14px 22px 14px 22px;
     border: none;
     font-size: 14px;
     min-width: 140px;
-    min-height: 36px;
+    min-height: 44px;
 }
 
 QTabBar::tab:selected {
@@ -39,10 +45,10 @@ QPushButton {
     color: #1e1e2e;
     border: none;
     border-radius: 6px;
-    padding: 10px 16px 8px 16px;
+    padding: 12px 18px 12px 18px;
     font-weight: bold;
     font-size: 13px;
-    min-height: 32px;
+    min-height: 40px;
 }
 
 QPushButton:hover {
@@ -78,9 +84,13 @@ QLineEdit, QTextEdit, QPlainTextEdit {
     background-color: #313244;
     border: 1px solid #45475a;
     border-radius: 6px;
-    padding: 8px 10px 6px 10px;
+    padding: 10px 12px 10px 12px;
     color: #cdd6f4;
     selection-background-color: #89b4fa;
+}
+
+QLineEdit {
+    min-height: 24px;
 }
 
 QLineEdit:focus, QTextEdit:focus {
@@ -91,10 +101,10 @@ QComboBox {
     background-color: #313244;
     border: 1px solid #45475a;
     border-radius: 6px;
-    padding: 8px 10px 6px 10px;
+    padding: 10px 12px 10px 12px;
     color: #cdd6f4;
     min-width: 100px;
-    min-height: 32px;
+    min-height: 40px;
 }
 
 QComboBox::drop-down {
@@ -114,9 +124,9 @@ QSpinBox {
     background-color: #313244;
     border: 1px solid #45475a;
     border-radius: 6px;
-    padding: 8px 10px 6px 10px;
+    padding: 10px 12px 10px 12px;
     color: #cdd6f4;
-    min-height: 32px;
+    min-height: 40px;
 }
 
 QGroupBox {
@@ -155,19 +165,19 @@ QScrollBar::handle:vertical:hover {
 
 QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical { height: 0; }
 
-QLabel {
-    color: #cdd6f4;
-}
-
 QLabel#labelTitle {
     font-size: 16px;
     font-weight: bold;
     color: #89b4fa;
+    min-height: 26px;
+    padding: 4px 2px;
 }
 
 QLabel#labelSub {
     color: #a6adc8;
     font-size: 12px;
+    min-height: 18px;
+    padding: 2px;
 }
 
 QCheckBox {
