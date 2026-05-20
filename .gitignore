@@ -1,0 +1,11 @@
+venv/
+__pycache__/
+*.pyc
+*.pyo
+.env
+images/
+data/posts.json
+data/post_queue.json
+*.log
+.idea/
+.vscode/
